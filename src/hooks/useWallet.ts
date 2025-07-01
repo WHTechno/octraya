@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { loadWallet, saveWallet } from '../services/wallet'
+import { loadWallet, saveWallet, clearWallet } from '../services/wallet'
 import * as nacl from 'tweetnacl'
 import { encode as encodeBase64, decode as decodeBase64 } from 'js-base64'
 
@@ -18,7 +18,24 @@ export function useWallet() {
     const initWallet = async () => {
       try {
         const loadedWallet = await loadWallet()
-        setWallet(loadedWallet)
+        
+        // Validate the private key integrity
+        try {
+          const privBytes = decodeBase64(loadedWallet.priv)
+          // Check if the private key has the correct length (64 bytes for tweetnacl secret key)
+          if (privBytes.length !== 64) {
+            throw new Error('Invalid private key length')
+          }
+          // Try to create a key pair to further validate the private key
+          nacl.sign.keyPair.fromSecretKey(privBytes)
+          
+          setWallet(loadedWallet)
+        } catch (validationErr) {
+          // Private key is corrupted, clear the wallet and create a new one
+          await clearWallet()
+          const newWallet = await createWallet()
+          setWallet(newWallet)
+        }
       } catch (err) {
         // If no wallet exists, create a new one
         try {
