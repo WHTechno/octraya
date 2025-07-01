@@ -3,31 +3,25 @@ import { decode as decodeBase64, encode as encodeBase64 } from 'js-base64'
 
 export const signTransaction = async (txData: any, privateKey: string): Promise<string> => {
   try {
-    // Create the message to sign
-    const message = JSON.stringify(txData)
-    const messageBytes = new TextEncoder().encode(message)
+    // Create the message to sign - exclude message field like in CLI
+    const { message, ...txForSigning } = txData
+    const messageToSign = JSON.stringify(txForSigning, null, 0).replace(/\s/g, '')
+    const messageBytes = new TextEncoder().encode(messageToSign)
     
-    // Decode the private key - handle both 32-byte and 64-byte formats
+    // Decode the private key
     const privateKeyBytes = decodeBase64(privateKey)
     
-    let secretKey: Uint8Array
-    if (privateKeyBytes.length === 32) {
-      // If it's a 32-byte seed, generate the full keypair
-      const keyPair = nacl.sign.keyPair.fromSeed(privateKeyBytes)
-      secretKey = keyPair.secretKey
-    } else if (privateKeyBytes.length === 64) {
-      // If it's already a 64-byte secret key, use it directly
-      secretKey = privateKeyBytes
-    } else {
+    if (privateKeyBytes.length !== 64) {
       throw new Error('Invalid private key length')
     }
     
     // Sign the message
-    const signature = nacl.sign.detached(messageBytes, secretKey)
+    const signature = nacl.sign.detached(messageBytes, privateKeyBytes)
     
     // Return base64 encoded signature
     return encodeBase64(signature)
   } catch (error) {
+    console.error('Signing error:', error)
     throw new Error('Failed to sign transaction')
   }
 }
@@ -40,30 +34,25 @@ export const getPublicKeyFromPrivate = (privateKey: string): string => {
     
     const privateKeyBytes = decodeBase64(privateKey)
     
-    let publicKey: Uint8Array
-    if (privateKeyBytes.length === 32) {
-      // If it's a 32-byte seed, generate the keypair and extract public key
-      const keyPair = nacl.sign.keyPair.fromSeed(privateKeyBytes)
-      publicKey = keyPair.publicKey
-    } else if (privateKeyBytes.length === 64) {
-      // If it's a 64-byte secret key, extract the public key from the last 32 bytes
-      publicKey = privateKeyBytes.slice(32)
-    } else {
+    if (privateKeyBytes.length !== 64) {
       throw new Error('Invalid private key length')
     }
+    
+    // Extract the public key from the last 32 bytes of the secret key
+    const publicKey = privateKeyBytes.slice(32)
     
     return encodeBase64(publicKey)
   } catch (error) {
     console.error('Error extracting public key:', error)
-    return ''
+    throw new Error('Invalid private key length')
   }
 }
 
 export const generateKeyPair = () => {
   const keyPair = nacl.sign.keyPair()
   return {
-    privateKey: encodeBase64(keyPair.secretKey.slice(0, 32)), // Store only the seed (32 bytes)
+    privateKey: encodeBase64(keyPair.secretKey), // Store full 64-byte secret key like CLI
     publicKey: encodeBase64(keyPair.publicKey),
-    secretKey: encodeBase64(keyPair.secretKey) // Full 64-byte secret key
+    address: `oct${encodeBase64(keyPair.publicKey)}`
   }
 }

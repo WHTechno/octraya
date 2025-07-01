@@ -7,7 +7,7 @@ import {
   sendTransaction 
 } from '../services/api'
 import { useWallet } from './useWallet'
-import { signTransaction } from '../services/crypto'
+import { signTransaction, getPublicKeyFromPrivate } from '../services/crypto'
 
 interface Transaction {
   hash: string
@@ -36,7 +36,8 @@ export function useOctra() {
     setError(null)
     try {
       const data = await getBalance(address, rpc)
-      // Handle different possible response formats
+      
+      // Handle different possible response formats like CLI
       if (typeof data === 'object' && data !== null) {
         // Parse balance as string or number
         const balanceValue = typeof data.balance === 'string' 
@@ -50,26 +51,30 @@ export function useOctra() {
         
         setBalance(isNaN(balanceValue) ? 0 : balanceValue)
         setNonce(isNaN(nonceValue) ? 0 : nonceValue)
+      } else if (typeof data === 'string') {
+        // Handle plain text response like CLI does
+        try {
+          const parts = data.trim().split()
+          if (parts.length >= 2) {
+            const balanceValue = parseFloat(parts[0])
+            const nonceValue = parseInt(parts[1], 10)
+            setBalance(isNaN(balanceValue) ? 0 : balanceValue)
+            setNonce(isNaN(nonceValue) ? 0 : nonceValue)
+          } else {
+            setBalance(0)
+            setNonce(0)
+          }
+        } catch {
+          setBalance(0)
+          setNonce(0)
+        }
       } else {
         setBalance(0)
         setNonce(0)
       }
     } catch (err) {
       console.error('Balance fetch error:', err)
-      
-      // Provide more specific error messages based on error type
-      if (err instanceof Error) {
-        if (err.message.includes('Network Error') || err.message.includes('ECONNREFUSED')) {
-          setError('Unable to connect to Octra network. Please check your internet connection or try again later.')
-        } else if (err.message.includes('timeout')) {
-          setError('Request timed out. The Octra network may be experiencing high traffic.')
-        } else {
-          setError(`Network error: ${err.message}`)
-        }
-      } else {
-        setError('Failed to fetch balance')
-      }
-      
+      setError('Failed to fetch balance')
       setBalance(0)
       setNonce(0)
     } finally {
@@ -105,10 +110,19 @@ export function useOctra() {
         .map((detail: any) => {
           const tx = detail.parsed_tx || detail
           const isIncoming = tx.to === address
+          
+          // Handle amount like CLI - check for amount_raw first
+          let amount = 0
+          if (tx.amount_raw) {
+            amount = parseFloat(tx.amount_raw) / 1000000 // Convert from raw to OCT
+          } else if (tx.amount) {
+            amount = parseFloat(tx.amount)
+          }
+          
           return {
             hash: detail.hash || tx.hash,
             time: new Date((tx.timestamp || Date.now() / 1000) * 1000),
-            amount: Math.abs(parseFloat(tx.amount) || 0),
+            amount: Math.abs(amount),
             to: tx.to || '',
             from: tx.from || '',
             type: isIncoming ? 'in' : 'out' as 'in' | 'out',
@@ -121,17 +135,7 @@ export function useOctra() {
       setTransactions(newTransactions)
     } catch (err) {
       console.error('Transaction fetch error:', err)
-      
-      // Provide more specific error messages for transaction fetching
-      if (err instanceof Error) {
-        if (err.message.includes('Network Error') || err.message.includes('ECONNREFUSED')) {
-          setError('Unable to connect to Octra network to fetch transactions.')
-        } else {
-          setError(`Failed to fetch transactions: ${err.message}`)
-        }
-      } else {
-        setError('Failed to fetch transactions')
-      }
+      setError('Failed to fetch transactions')
     } finally {
       setLoading(false)
     }
@@ -145,43 +149,52 @@ export function useOctra() {
       setStagingCount(ourTxs.length)
     } catch (err) {
       console.error('Staging fetch error:', err)
-      
-      // Don't set error for staging failures as it's less critical
-      if (err instanceof Error && (err.message.includes('Network Error') || err.message.includes('ECONNREFUSED'))) {
-        console.warn('Unable to connect to Octra network to fetch staging transactions.')
-      }
       setStagingCount(0)
     }
   }
 
   const send = async (to: string, amount: number, message?: string) => {
-    if (!address || nonce === null || !privateKey) throw new Error('Wallet not ready')
+    if (!address || nonce === null || !privateKey) {
+      throw new Error('Wallet not ready')
+    }
     
+    // Create transaction object like CLI
     const tx = {
       from: address,
       to_: to,
-      amount: amount.toString(),
+      amount: Math.floor(amount * 1000000).toString(), // Convert to raw amount like CLI
       nonce: nonce + 1,
       ou: amount < 1000 ? "1" : "3",
-      timestamp: Math.floor(Date.now() / 1000)
+      timestamp: Math.floor(Date.now() / 1000) + Math.random() * 0.01
     }
     
-    const signature = await signTransaction(tx, privateKey)
+    // Add message if provided
+    if (message) {
+      (tx as any).message = message
+    }
     
-    const response = await sendTransaction({
-      ...tx,
-      signature,
-      public_key: privateKey.slice(64) // Extract public key from private key
-    }, rpc)
-    
-    // Refresh data after sending
-    setTimeout(() => {
-      refreshBalance()
-      refreshTransactions()
-      refreshStaging()
-    }, 1000)
-    
-    return response
+    try {
+      const signature = await signTransaction(tx, privateKey)
+      const publicKey = getPublicKeyFromPrivate(privateKey)
+      
+      const response = await sendTransaction({
+        ...tx,
+        signature,
+        public_key: publicKey
+      }, rpc)
+      
+      // Refresh data after sending
+      setTimeout(() => {
+        refreshBalance()
+        refreshTransactions()
+        refreshStaging()
+      }, 1000)
+      
+      return response
+    } catch (err) {
+      console.error('Send transaction error:', err)
+      throw err
+    }
   }
 
   const clearHistory = () => {

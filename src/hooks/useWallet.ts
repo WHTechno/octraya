@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react'
 import { loadWallet, saveWallet, clearWallet } from '../services/wallet'
+import { generateKeyPair } from '../services/crypto'
 import * as nacl from 'tweetnacl'
 import { encode as encodeBase64, decode as decodeBase64 } from 'js-base64'
 
@@ -23,7 +24,7 @@ export function useWallet() {
         try {
           const privBytes = decodeBase64(loadedWallet.priv)
           
-          // Check if the private key has the correct length FIRST
+          // Check if the private key has the correct length
           if (privBytes.length !== 64) {
             throw new Error('Invalid private key length')
           }
@@ -56,14 +57,11 @@ export function useWallet() {
 
   const createWallet = async (rpcUrl = 'https://octra.network') => {
     try {
-      const keyPair = nacl.sign.keyPair()
-      const priv = encodeBase64(keyPair.secretKey)
-      const pub = encodeBase64(keyPair.publicKey)
-      const addr = `oct${pub}`
+      const { privateKey, publicKey, address } = generateKeyPair()
       
       const newWallet = {
-        priv,
-        addr,
+        priv: privateKey,
+        addr: address,
         rpc: rpcUrl
       }
       

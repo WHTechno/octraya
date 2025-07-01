@@ -8,29 +8,15 @@ const api = axios.create({
   }
 })
 
-// Add request interceptor to handle CORS
-api.interceptors.request.use(
-  (config) => {
-    // Ensure we're making proper requests
-    if (config.url && !config.url.startsWith('http')) {
-      config.url = config.baseURL + config.url
-    }
-    return config
-  },
-  (error) => {
-    return Promise.reject(error)
-  }
-)
-
-// Add response interceptor to handle different response formats
+// Add response interceptor to handle different response formats like CLI
 api.interceptors.response.use(
   (response) => {
-    // If the response is text/plain, try to parse it as JSON
+    // If the response is text/plain, try to parse it as JSON first
     if (typeof response.data === 'string') {
       try {
         response.data = JSON.parse(response.data)
       } catch (e) {
-        // If it's not valid JSON, keep it as string
+        // If it's not valid JSON, keep it as string (like CLI handles it)
       }
     }
     return response
@@ -58,11 +44,11 @@ export const getAddressInfo = async (address: string, rpcUrl: string) => {
     return response.data
   } catch (error) {
     if (axios.isAxiosError(error)) {
-      // Handle 404 errors
+      // Handle 404 errors like CLI
       if (error.response?.status === 404) {
         return { recent_transactions: [] }
       }
-      // Handle network errors (no response received)
+      // Handle network errors
       if (!error.response) {
         return { recent_transactions: [] }
       }
@@ -82,11 +68,11 @@ export const getStaging = async (rpcUrl: string) => {
     return response.data
   } catch (error) {
     if (axios.isAxiosError(error)) {
-      // Handle 404 errors
+      // Handle 404 errors like CLI
       if (error.response?.status === 404) {
         return { staged_transactions: [] }
       }
-      // Handle network errors (no response received)
+      // Handle network errors
       if (!error.response) {
         return { staged_transactions: [] }
       }
