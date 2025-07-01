@@ -56,7 +56,20 @@ export function useOctra() {
       }
     } catch (err) {
       console.error('Balance fetch error:', err)
-      setError('Failed to fetch balance')
+      
+      // Provide more specific error messages based on error type
+      if (err instanceof Error) {
+        if (err.message.includes('Network Error') || err.message.includes('ECONNREFUSED')) {
+          setError('Unable to connect to Octra network. Please check your internet connection or try again later.')
+        } else if (err.message.includes('timeout')) {
+          setError('Request timed out. The Octra network may be experiencing high traffic.')
+        } else {
+          setError(`Network error: ${err.message}`)
+        }
+      } else {
+        setError('Failed to fetch balance')
+      }
+      
       setBalance(0)
       setNonce(0)
     } finally {
@@ -108,7 +121,17 @@ export function useOctra() {
       setTransactions(newTransactions)
     } catch (err) {
       console.error('Transaction fetch error:', err)
-      setError('Failed to fetch transactions')
+      
+      // Provide more specific error messages for transaction fetching
+      if (err instanceof Error) {
+        if (err.message.includes('Network Error') || err.message.includes('ECONNREFUSED')) {
+          setError('Unable to connect to Octra network to fetch transactions.')
+        } else {
+          setError(`Failed to fetch transactions: ${err.message}`)
+        }
+      } else {
+        setError('Failed to fetch transactions')
+      }
     } finally {
       setLoading(false)
     }
@@ -122,7 +145,11 @@ export function useOctra() {
       setStagingCount(ourTxs.length)
     } catch (err) {
       console.error('Staging fetch error:', err)
-      setError('Failed to fetch staging transactions')
+      
+      // Don't set error for staging failures as it's less critical
+      if (err instanceof Error && (err.message.includes('Network Error') || err.message.includes('ECONNREFUSED'))) {
+        console.warn('Unable to connect to Octra network to fetch staging transactions.')
+      }
       setStagingCount(0)
     }
   }

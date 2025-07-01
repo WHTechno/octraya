@@ -22,16 +22,19 @@ export function useWallet() {
         // Validate the private key integrity
         try {
           const privBytes = decodeBase64(loadedWallet.priv)
-          // Check if the private key has the correct length (64 bytes for tweetnacl secret key)
+          
+          // Check if the private key has the correct length FIRST
           if (privBytes.length !== 64) {
             throw new Error('Invalid private key length')
           }
+          
           // Try to create a key pair to further validate the private key
           nacl.sign.keyPair.fromSecretKey(privBytes)
           
           setWallet(loadedWallet)
         } catch (validationErr) {
           // Private key is corrupted, clear the wallet and create a new one
+          console.warn('Private key validation failed, creating new wallet:', validationErr)
           await clearWallet()
           const newWallet = await createWallet()
           setWallet(newWallet)
@@ -76,6 +79,12 @@ export function useWallet() {
   const importWallet = async (privateKey: string, rpcUrl = 'https://octra.network') => {
     try {
       const privBytes = decodeBase64(privateKey)
+      
+      // Validate private key length before proceeding
+      if (privBytes.length !== 64) {
+        throw new Error('Invalid private key length')
+      }
+      
       const keyPair = nacl.sign.keyPair.fromSecretKey(privBytes)
       const pub = encodeBase64(keyPair.publicKey)
       const addr = `oct${pub}`
