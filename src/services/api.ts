@@ -1,8 +1,44 @@
 import axios from 'axios'
 
 const api = axios.create({
-  timeout: 10000
+  timeout: 10000,
+  headers: {
+    'Accept': 'application/json, text/plain, */*',
+    'Content-Type': 'application/json'
+  }
 })
+
+// Add request interceptor to handle CORS
+api.interceptors.request.use(
+  (config) => {
+    // Ensure we're making proper requests
+    if (config.url && !config.url.startsWith('http')) {
+      config.url = config.baseURL + config.url
+    }
+    return config
+  },
+  (error) => {
+    return Promise.reject(error)
+  }
+)
+
+// Add response interceptor to handle different response formats
+api.interceptors.response.use(
+  (response) => {
+    // If the response is text/plain, try to parse it as JSON
+    if (typeof response.data === 'string') {
+      try {
+        response.data = JSON.parse(response.data)
+      } catch (e) {
+        // If it's not valid JSON, keep it as string
+      }
+    }
+    return response
+  },
+  (error) => {
+    return Promise.reject(error)
+  }
+)
 
 export const getBalance = async (address: string, rpcUrl: string) => {
   try {
