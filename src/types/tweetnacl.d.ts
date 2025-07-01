@@ -8,6 +8,7 @@ declare module 'tweetnacl' {
     function keyPair(): KeyPair;
     namespace keyPair {
       function fromSecretKey(secretKey: Uint8Array): KeyPair;
+      function fromSeed(seed: Uint8Array): KeyPair;
     }
     function detached(message: Uint8Array, secretKey: Uint8Array): Uint8Array;
     function verify(message: Uint8Array, signature: Uint8Array, publicKey: Uint8Array): boolean;
