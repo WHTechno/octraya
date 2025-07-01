@@ -38,8 +38,18 @@ export function useOctra() {
       const data = await getBalance(address, rpc)
       // Handle different possible response formats
       if (typeof data === 'object' && data !== null) {
-        setBalance(parseFloat(data.balance) || 0)
-        setNonce(parseInt(data.nonce) || 0)
+        // Parse balance as string or number
+        const balanceValue = typeof data.balance === 'string' 
+          ? parseFloat(data.balance) 
+          : (data.balance || 0)
+        
+        // Parse nonce as string or number
+        const nonceValue = typeof data.nonce === 'string'
+          ? parseInt(data.nonce, 10)
+          : (data.nonce || 0)
+        
+        setBalance(isNaN(balanceValue) ? 0 : balanceValue)
+        setNonce(isNaN(nonceValue) ? 0 : nonceValue)
       } else {
         setBalance(0)
         setNonce(0)
