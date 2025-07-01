@@ -1,87 +1,88 @@
-import axios from 'axios'
+import axios from 'axios';
 
 const api = axios.create({
   timeout: 10000,
   headers: {
     'Accept': 'application/json, text/plain, */*',
-    'Content-Type': 'application/json'
-  }
-})
+    'Content-Type': 'application/json',
+  },
+});
 
-// Add response interceptor to handle different response formats like CLI
+// Interceptor untuk parse jika response adalah string JSON (CLI-style)
 api.interceptors.response.use(
   (response) => {
-    // If the response is text/plain, try to parse it as JSON first
     if (typeof response.data === 'string') {
       try {
-        response.data = JSON.parse(response.data)
+        response.data = JSON.parse(response.data);
       } catch (e) {
-        // If it's not valid JSON, keep it as string (like CLI handles it)
+        // Not JSON? Leave it as string
       }
     }
-    return response
+    return response;
   },
   (error) => {
-    return Promise.reject(error)
+    return Promise.reject(error);
   }
-)
+);
+
+function validateRpcUrl(rpcUrl: string) {
+  if (!rpcUrl || !rpcUrl.startsWith('http')) {
+    throw new Error(`Invalid rpcUrl: "${rpcUrl}"`);
+  }
+}
 
 export const getBalance = async (address: string, rpcUrl: string) => {
+  validateRpcUrl(rpcUrl);
   try {
-    const response = await api.get(`${rpcUrl}/balance/${address}`)
-    return response.data
+    const response = await api.get(`${rpcUrl}/balance/${address}`);
+    return response.data;
   } catch (error) {
     if (axios.isAxiosError(error) && error.response?.status === 404) {
-      return { balance: 0, nonce: 0 }
+      return { balance: 0, nonce: 0 };
     }
-    throw error
+    console.error("Balance fetch error:", error);
+    throw error;
   }
-}
+};
 
 export const getAddressInfo = async (address: string, rpcUrl: string) => {
+  validateRpcUrl(rpcUrl);
   try {
-    const response = await api.get(`${rpcUrl}/address/${address}?limit=20`)
-    return response.data
+    const response = await api.get(`${rpcUrl}/address/${address}?limit=20`);
+    return response.data;
   } catch (error) {
     if (axios.isAxiosError(error)) {
-      // Handle 404 errors like CLI
-      if (error.response?.status === 404) {
-        return { recent_transactions: [] }
-      }
-      // Handle network errors
-      if (!error.response) {
-        return { recent_transactions: [] }
+      if (error.response?.status === 404 || !error.response) {
+        return { recent_transactions: [] };
       }
     }
-    throw error
+    throw error;
   }
-}
+};
 
 export const getTransaction = async (hash: string, rpcUrl: string) => {
-  const response = await api.get(`${rpcUrl}/tx/${hash}`)
-  return response.data
-}
+  validateRpcUrl(rpcUrl);
+  const response = await api.get(`${rpcUrl}/tx/${hash}`);
+  return response.data;
+};
 
 export const getStaging = async (rpcUrl: string) => {
+  validateRpcUrl(rpcUrl);
   try {
-    const response = await api.get(`${rpcUrl}/staging`)
-    return response.data
+    const response = await api.get(`${rpcUrl}/staging`);
+    return response.data;
   } catch (error) {
     if (axios.isAxiosError(error)) {
-      // Handle 404 errors like CLI
-      if (error.response?.status === 404) {
-        return { staged_transactions: [] }
-      }
-      // Handle network errors
-      if (!error.response) {
-        return { staged_transactions: [] }
+      if (error.response?.status === 404 || !error.response) {
+        return { staged_transactions: [] };
       }
     }
-    throw error
+    throw error;
   }
-}
+};
 
 export const sendTransaction = async (tx: any, rpcUrl: string) => {
-  const response = await api.post(`${rpcUrl}/send-tx`, tx)
-  return response.data
-}
+  validateRpcUrl(rpcUrl);
+  const response = await api.post(`${rpcUrl}/send-tx`, tx);
+  return response.data;
+};
