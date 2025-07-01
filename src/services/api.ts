@@ -45,8 +45,15 @@ export const getStaging = async (rpcUrl: string) => {
     const response = await api.get(`${rpcUrl}/staging`)
     return response.data
   } catch (error) {
-    if (axios.isAxiosError(error) && error.response?.status === 404) {
-      return { staged_transactions: [] }
+    if (axios.isAxiosError(error)) {
+      // Handle 404 errors
+      if (error.response?.status === 404) {
+        return { staged_transactions: [] }
+      }
+      // Handle network errors (no response received)
+      if (!error.response) {
+        return { staged_transactions: [] }
+      }
     }
     throw error
   }
