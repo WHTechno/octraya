@@ -49,7 +49,7 @@ export default function MultiSend() {
     let isValid = true
     const validatedRecipients = recipients.map(r => {
       const amountNum = parseFloat(r.amount)
-      if (!validateAddress(r.address) {
+      if (!validateAddress(r.address)) {
         isValid = false
         return { ...r, error: 'Invalid address' }
       }
