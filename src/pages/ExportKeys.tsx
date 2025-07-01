@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { useWallet } from '../hooks/useWallet'
+import { getPublicKeyFromPrivate } from '../services/crypto'
 import copy from 'copy-to-clipboard'
-import { encodeBase64 } from 'js-base64'
 
 export default function ExportKeys() {
   const { address, privateKey, wallet } = useWallet()
@@ -27,6 +27,8 @@ export default function ExportKeys() {
     document.body.removeChild(a)
     URL.revokeObjectURL(url)
   }
+
+  const publicKey = privateKey ? getPublicKeyFromPrivate(privateKey) : ''
 
   return (
     <div className="max-w-md mx-auto bg-white rounded-lg shadow overflow-hidden">
@@ -58,11 +60,11 @@ export default function ExportKeys() {
             <input
               type="text"
               readOnly
-              value={privateKey ? encodeBase64(privateKey.slice(32)) : ''}
+              value={publicKey}
               className="flex-1 border border-gray-300 rounded-l-md py-2 px-3 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm font-mono"
             />
             <button
-              onClick={() => handleCopy(privateKey ? encodeBase64(privateKey.slice(32)) : '', 'public')}
+              onClick={() => handleCopy(publicKey, 'public')}
               className="inline-flex items-center px-3 py-2 border border-l-0 border-gray-300 bg-gray-50 text-sm font-medium text-gray-700 rounded-r-md hover:bg-gray-100 focus:outline-none focus:ring-1 focus:ring-blue-500 focus:border-blue-500"
             >
               {copied === 'public' ? 'Copied!' : 'Copy'}

@@ -7,7 +7,7 @@ import {
   sendTransaction 
 } from '../services/api'
 import { useWallet } from './useWallet'
-import { format } from 'date-fns'
+import { signTransaction } from '../services/crypto'
 
 interface Transaction {
   hash: string
@@ -21,8 +21,8 @@ interface Transaction {
   message?: string
 }
 
-export default function useOctra() {
-  const { address, rpc } = useWallet()
+export function useOctra() {
+  const { address, rpc, privateKey } = useWallet()
   const [balance, setBalance] = useState<number | null>(null)
   const [nonce, setNonce] = useState<number | null>(null)
   const [transactions, setTransactions] = useState<Transaction[]>([])
@@ -53,6 +53,7 @@ export default function useOctra() {
       
       const txDetails = await Promise.all(
         txHashes.map((hash: string) => getTransaction(hash, rpc))
+      )
       
       const newTransactions = txDetails.map((detail: any) => {
         const tx = detail.parsed_tx
@@ -90,7 +91,7 @@ export default function useOctra() {
   }
 
   const send = async (to: string, amount: number, message?: string) => {
-    if (!address || !nonce) throw new Error('Wallet not ready')
+    if (!address || nonce === null || !privateKey) throw new Error('Wallet not ready')
     
     const tx = {
       from: address,
@@ -98,15 +99,15 @@ export default function useOctra() {
       amount: amount.toString(),
       nonce: nonce + 1,
       ou: amount < 1000 ? "1" : "3",
-      timestamp: Date.now() / 1000
+      timestamp: Math.floor(Date.now() / 1000)
     }
     
-    const signature = await signTransaction(tx)
+    const signature = await signTransaction(tx, privateKey)
     
     const response = await sendTransaction({
       ...tx,
       signature,
-      public_key: getPublicKey()
+      public_key: privateKey.slice(64) // Extract public key from private key
     }, rpc)
     
     await refreshBalance()
@@ -116,15 +117,8 @@ export default function useOctra() {
     return response
   }
 
-  const signTransaction = async (txData: any) => {
-    // Implement signing logic using wallet private key
-    // This is a placeholder - actual signing should use tweetnacl
-    return 'signature-placeholder'
-  }
-
-  const getPublicKey = () => {
-    // Implement getting public key from wallet
-    return 'public-key-placeholder'
+  const clearHistory = () => {
+    setTransactions([])
   }
 
   useEffect(() => {
@@ -145,6 +139,7 @@ export default function useOctra() {
     refreshBalance,
     refreshTransactions,
     refreshStaging,
-    send
+    send,
+    clearHistory
   }
 }

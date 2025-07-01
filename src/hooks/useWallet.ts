@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react'
 import { loadWallet, saveWallet } from '../services/wallet'
 import * as nacl from 'tweetnacl'
-import { encodeBase64 } from 'js-base64'
+import { encode as encodeBase64, decode as decodeBase64 } from 'js-base64'
 
 export interface WalletData {
   priv: string
@@ -9,7 +9,7 @@ export interface WalletData {
   rpc: string
 }
 
-export default function useWallet() {
+export function useWallet() {
   const [wallet, setWallet] = useState<WalletData | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -20,7 +20,13 @@ export default function useWallet() {
         const loadedWallet = await loadWallet()
         setWallet(loadedWallet)
       } catch (err) {
-        setError('Failed to load wallet')
+        // If no wallet exists, create a new one
+        try {
+          const newWallet = await createWallet()
+          setWallet(newWallet)
+        } catch (createErr) {
+          setError('Failed to create wallet')
+        }
       } finally {
         setLoading(false)
       }
