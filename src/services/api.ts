@@ -1,5 +1,4 @@
 import axios from 'axios'
-import { useWallet } from '../hooks/useWallet'
 
 const api = axios.create({
   timeout: 10000
@@ -18,8 +17,15 @@ export const getBalance = async (address: string, rpcUrl: string) => {
 }
 
 export const getAddressInfo = async (address: string, rpcUrl: string) => {
-  const response = await api.get(`${rpcUrl}/address/${address}?limit=20`)
-  return response.data
+  try {
+    const response = await api.get(`${rpcUrl}/address/${address}?limit=20`)
+    return response.data
+  } catch (error) {
+    if (axios.isAxiosError(error) && error.response?.status === 404) {
+      return { recent_transactions: [] }
+    }
+    throw error
+  }
 }
 
 export const getTransaction = async (hash: string, rpcUrl: string) => {
@@ -28,8 +34,15 @@ export const getTransaction = async (hash: string, rpcUrl: string) => {
 }
 
 export const getStaging = async (rpcUrl: string) => {
-  const response = await api.get(`${rpcUrl}/staging`)
-  return response.data
+  try {
+    const response = await api.get(`${rpcUrl}/staging`)
+    return response.data
+  } catch (error) {
+    if (axios.isAxiosError(error) && error.response?.status === 404) {
+      return { staged_transactions: [] }
+    }
+    throw error
+  }
 }
 
 export const sendTransaction = async (tx: any, rpcUrl: string) => {

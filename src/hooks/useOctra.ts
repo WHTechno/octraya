@@ -33,12 +33,22 @@ export function useOctra() {
   const refreshBalance = async () => {
     if (!address) return
     setLoading(true)
+    setError(null)
     try {
       const data = await getBalance(address, rpc)
-      setBalance(data.balance || 0)
-      setNonce(data.nonce || 0)
+      // Handle different possible response formats
+      if (typeof data === 'object' && data !== null) {
+        setBalance(parseFloat(data.balance) || 0)
+        setNonce(parseInt(data.nonce) || 0)
+      } else {
+        setBalance(0)
+        setNonce(0)
+      }
     } catch (err) {
+      console.error('Balance fetch error:', err)
       setError('Failed to fetch balance')
+      setBalance(0)
+      setNonce(0)
     } finally {
       setLoading(false)
     }
@@ -51,28 +61,43 @@ export function useOctra() {
       const addressInfo = await getAddressInfo(address, rpc)
       const txHashes = addressInfo.recent_transactions?.map((tx: any) => tx.hash) || []
       
+      if (txHashes.length === 0) {
+        setTransactions([])
+        return
+      }
+
       const txDetails = await Promise.all(
-        txHashes.map((hash: string) => getTransaction(hash, rpc))
+        txHashes.map(async (hash: string) => {
+          try {
+            return await getTransaction(hash, rpc)
+          } catch (err) {
+            console.error(`Failed to fetch transaction ${hash}:`, err)
+            return null
+          }
+        })
       )
       
-      const newTransactions = txDetails.map((detail: any) => {
-        const tx = detail.parsed_tx
-        const isIncoming = tx.to === address
-        return {
-          hash: detail.hash,
-          time: new Date(tx.timestamp * 1000),
-          amount: isIncoming ? tx.amount : -tx.amount,
-          to: tx.to,
-          from: tx.from,
-          type: isIncoming ? 'in' : 'out',
-          nonce: tx.nonce,
-          epoch: detail.epoch,
-          message: detail.message
-        }
-      })
+      const newTransactions = txDetails
+        .filter(detail => detail !== null)
+        .map((detail: any) => {
+          const tx = detail.parsed_tx || detail
+          const isIncoming = tx.to === address
+          return {
+            hash: detail.hash || tx.hash,
+            time: new Date((tx.timestamp || Date.now() / 1000) * 1000),
+            amount: Math.abs(parseFloat(tx.amount) || 0),
+            to: tx.to || '',
+            from: tx.from || '',
+            type: isIncoming ? 'in' : 'out' as 'in' | 'out',
+            nonce: parseInt(tx.nonce) || 0,
+            epoch: detail.epoch,
+            message: tx.message || detail.message
+          }
+        })
       
       setTransactions(newTransactions)
     } catch (err) {
+      console.error('Transaction fetch error:', err)
       setError('Failed to fetch transactions')
     } finally {
       setLoading(false)
@@ -86,7 +111,9 @@ export function useOctra() {
       const ourTxs = staging.staged_transactions?.filter((tx: any) => tx.from === address) || []
       setStagingCount(ourTxs.length)
     } catch (err) {
+      console.error('Staging fetch error:', err)
       setError('Failed to fetch staging transactions')
+      setStagingCount(0)
     }
   }
 
@@ -110,9 +137,12 @@ export function useOctra() {
       public_key: privateKey.slice(64) // Extract public key from private key
     }, rpc)
     
-    await refreshBalance()
-    await refreshTransactions()
-    await refreshStaging()
+    // Refresh data after sending
+    setTimeout(() => {
+      refreshBalance()
+      refreshTransactions()
+      refreshStaging()
+    }, 1000)
     
     return response
   }
