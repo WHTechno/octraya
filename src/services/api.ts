@@ -21,8 +21,15 @@ export const getAddressInfo = async (address: string, rpcUrl: string) => {
     const response = await api.get(`${rpcUrl}/address/${address}?limit=20`)
     return response.data
   } catch (error) {
-    if (axios.isAxiosError(error) && error.response?.status === 404) {
-      return { recent_transactions: [] }
+    if (axios.isAxiosError(error)) {
+      // Handle 404 errors
+      if (error.response?.status === 404) {
+        return { recent_transactions: [] }
+      }
+      // Handle network errors (no response received)
+      if (!error.response) {
+        return { recent_transactions: [] }
+      }
     }
     throw error
   }
